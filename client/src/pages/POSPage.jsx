@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, UserPlus } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -70,8 +70,11 @@ export default function POSPage() {
   const [productsError, setProductsError] = useState("");
 
   const [search, setSearch] = useState("");
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [isScanningBarcode, setIsScanningBarcode] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
   const [activeColor, setActiveColor] = useState("all");
+  const scannerInputRef = useRef(null);
 
   const [cart, setCart] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
@@ -152,10 +155,10 @@ export default function POSPage() {
     loadProducts();
   }, [loadProducts]);
 
-  function findVariantForProduct(product) {
-    if (activeColor !== "all") {
+  function findVariantForProduct(product, preferredColor = activeColor) {
+    if (preferredColor !== "all") {
       const matchedVariant = product.colors.find(
-        (color) => String(color.id) === String(activeColor)
+        (color) => String(color.id) === String(preferredColor)
       );
       if (matchedVariant) {
         return matchedVariant;
@@ -173,8 +176,8 @@ export default function POSPage() {
     return Math.min(product.stock_quantity, variant.stock_quantity);
   }
 
-  function addProductToCart(product) {
-    const variant = findVariantForProduct(product);
+  function addProductToCart(product, preferredColor = activeColor) {
+    const variant = findVariantForProduct(product, preferredColor);
     const stockCap = getStockCap(product, variant);
 
     if (stockCap <= 0) {
@@ -264,6 +267,63 @@ export default function POSPage() {
 
   function removeLineItem(itemKey) {
     setCart((currentCart) => currentCart.filter((item) => item.key !== itemKey));
+  }
+
+  async function processScannedCode(rawCode) {
+    const barcode = String(rawCode || "").trim().toUpperCase();
+
+    if (!barcode) {
+      return;
+    }
+
+    let matchedProduct = products.find(
+      (product) => String(product.sku || "").toUpperCase() === barcode
+    );
+
+    if (!matchedProduct) {
+      try {
+        const searchedProducts = await getProducts({ search: barcode });
+        matchedProduct =
+          searchedProducts.find(
+            (product) => String(product.sku || "").toUpperCase() === barcode
+          ) || null;
+      } catch (error) {
+        toast.error(error.message || "Unable to validate scanned barcode.");
+        return;
+      }
+    }
+
+    if (!matchedProduct) {
+      toast.error(`No product found for barcode: ${barcode}`);
+      return;
+    }
+
+    addProductToCart(matchedProduct, "all");
+    toast.success(`Scanned ${matchedProduct.sku}`);
+  }
+
+  async function handleBarcodeSubmit(event) {
+    event.preventDefault();
+
+    if (isScanningBarcode) {
+      return;
+    }
+
+    const code = barcodeInput;
+
+    if (!code.trim()) {
+      return;
+    }
+
+    setIsScanningBarcode(true);
+
+    try {
+      await processScannedCode(code);
+      setBarcodeInput("");
+    } finally {
+      setIsScanningBarcode(false);
+      scannerInputRef.current?.focus();
+    }
   }
 
   async function handleQuickAddCustomer() {
@@ -356,6 +416,22 @@ export default function POSPage() {
                 placeholder="Search products by name or SKU..."
                 style={{ paddingLeft: "2.2rem" }}
               />
+            </div>
+
+            <form className="barcode-scan-row" onSubmit={handleBarcodeSubmit}>
+              <Input
+                ref={scannerInputRef}
+                value={barcodeInput}
+                onChange={(event) => setBarcodeInput(event.target.value)}
+                placeholder="Scan barcode or enter SKU and press Enter..."
+                autoComplete="off"
+              />
+              <Button type="submit" variant="secondary" disabled={isScanningBarcode}>
+                {isScanningBarcode ? "Scanning..." : "Scan"}
+              </Button>
+            </form>
+            <div className="scanner-hint">
+              Barcode scanner input is enabled. Keep this field focused while scanning.
             </div>
 
             <div>

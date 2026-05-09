@@ -461,6 +461,22 @@ p {
   gap: 0.6rem;
 }
 
+.barcode-scan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.barcode-scan-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.scanner-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 .color-dot {
   width: 13px;
   height: 13px;
@@ -761,6 +777,11 @@ p {
 
   .nav-list {
     grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+  }
+
+  .barcode-scan-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .auth-hints {

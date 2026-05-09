@@ -78,10 +78,12 @@ On first run, SQLite is created at `server/cloth-pos.db` and seeded with:
 
 - `/` POS checkout page
   - Product grid with search, category tabs, color filters
+  - Barcode/SKU scanner input (scan and auto-add to cart)
   - Live cart with quantity controls
   - Customer selector + quick add
   - Discount and tax controls
   - Complete sale + printable receipt modal
+  - Branded PDF invoice download from receipt modal
 - `/dashboard`
   - KPI cards
   - 7-day sales bar chart

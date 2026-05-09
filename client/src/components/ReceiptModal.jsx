@@ -1,11 +1,23 @@
+import { FileDown, Printer } from "lucide-react";
+import { toast } from "react-hot-toast";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import Modal from "./ui/Modal";
 import { formatCurrency, formatDateTime } from "../utils/format";
+import { downloadInvoicePdf } from "../utils/invoicePdf";
 
 export default function ReceiptModal({ sale, isOpen, onClose }) {
   if (!sale) {
     return null;
+  }
+
+  function handleDownloadPdf() {
+    try {
+      downloadInvoicePdf(sale);
+      toast.success(`Invoice #${sale.id} downloaded.`);
+    } catch (error) {
+      toast.error(error.message || "Failed to generate invoice PDF.");
+    }
   }
 
   return (
@@ -15,8 +27,11 @@ export default function ReceiptModal({ sale, isOpen, onClose }) {
       onClose={onClose}
       footer={
         <>
+          <Button variant="secondary" onClick={handleDownloadPdf}>
+            <FileDown size={15} /> Download PDF Invoice
+          </Button>
           <Button variant="secondary" onClick={() => window.print()}>
-            Print Receipt
+            <Printer size={15} /> Print Receipt
           </Button>
           <Button onClick={onClose}>Close</Button>
         </>
