@@ -1,0 +1,16 @@
+node_modules
+client/node_modules
+server/node_modules
+dist
+client/dist
+.env
+*.db
+*.db-shm
+*.db-wal
+npm-debug.log*
+coverage
+.vite
+.DS_Store
+.tmp
+.npm-cache
+.node-gyp

@@ -1,0 +1,19 @@
+{
+  "name": "cloth-pos",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && node index.js",
+    "client": "cd client && npm run dev",
+    "build": "npm run build --workspace client",
+    "start": "npm run server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
