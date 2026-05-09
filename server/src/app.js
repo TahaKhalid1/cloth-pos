@@ -1,6 +1,8 @@
 const express = require("express");
+const bcrypt = require("bcryptjs");
 const cors = require("cors");
 const morgan = require("morgan");
+const { createAuthHelpers } = require("./auth");
 const { db } = require("./db");
 
 function toMoney(value) {
@@ -757,6 +759,15 @@ const deleteSaleItemTransaction = db.transaction((saleItemId) => {
 
 function createApp() {
   const app = express();
+  const {
+    JWT_EXPIRES_IN,
+    sanitizeUser,
+    getUserByUsername,
+    signAccessToken,
+    authenticateRequest,
+    authorizeRoles
+  } = createAuthHelpers(db);
+  const managerOnly = authorizeRoles("manager");
 
   app.use(cors());
   app.use(express.json());
@@ -775,6 +786,48 @@ function createApp() {
       timestamp: new Date().toISOString()
     });
   });
+
+  app.post("/api/auth/login", (req, res) => {
+    const username =
+      typeof req.body.username === "string" ? req.body.username.trim().toLowerCase() : "";
+    const password = typeof req.body.password === "string" ? req.body.password : "";
+
+    if (!username || !password) {
+      return res.status(400).json({ error: "username and password are required." });
+    }
+
+    const user = getUserByUsername(username);
+
+    if (!user || user.is_active !== 1) {
+      return res.status(401).json({ error: "Invalid credentials." });
+    }
+
+    const validPassword = bcrypt.compareSync(password, user.password_hash);
+
+    if (!validPassword) {
+      return res.status(401).json({ error: "Invalid credentials." });
+    }
+
+    const safeUser = sanitizeUser(user);
+    const token = signAccessToken(safeUser);
+
+    return res.json({
+      token,
+      token_type: "Bearer",
+      expires_in: JWT_EXPIRES_IN,
+      user: safeUser
+    });
+  });
+
+  app.get("/api/auth/me", authenticateRequest, (req, res) => {
+    return res.json({ user: req.user });
+  });
+
+  app.post("/api/auth/logout", authenticateRequest, (_req, res) => {
+    return res.status(204).send();
+  });
+
+  app.use("/api", authenticateRequest);
 
   app.get("/api/categories", (_req, res) => {
     const categories = db
@@ -801,7 +854,7 @@ function createApp() {
     return res.json(category);
   });
 
-  app.post("/api/categories", (req, res, next) => {
+  app.post("/api/categories", managerOnly, (req, res, next) => {
     try {
       const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
 
@@ -823,7 +876,7 @@ function createApp() {
     }
   });
 
-  app.put("/api/categories/:id", (req, res, next) => {
+  app.put("/api/categories/:id", managerOnly, (req, res, next) => {
     try {
       const categoryId = parsePositiveInteger(req.params.id);
       if (!categoryId) {
@@ -853,7 +906,7 @@ function createApp() {
     }
   });
 
-  app.delete("/api/categories/:id", (req, res, next) => {
+  app.delete("/api/categories/:id", managerOnly, (req, res, next) => {
     try {
       const categoryId = parsePositiveInteger(req.params.id);
       if (!categoryId) {
@@ -899,7 +952,7 @@ function createApp() {
     return res.json(color);
   });
 
-  app.post("/api/colors", (req, res, next) => {
+  app.post("/api/colors", managerOnly, (req, res, next) => {
     try {
       const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
       const hexCode =
@@ -929,7 +982,7 @@ function createApp() {
     }
   });
 
-  app.put("/api/colors/:id", (req, res, next) => {
+  app.put("/api/colors/:id", managerOnly, (req, res, next) => {
     try {
       const colorId = parsePositiveInteger(req.params.id);
       if (!colorId) {
@@ -968,7 +1021,7 @@ function createApp() {
     }
   });
 
-  app.delete("/api/colors/:id", (req, res, next) => {
+  app.delete("/api/colors/:id", managerOnly, (req, res, next) => {
     try {
       const colorId = parsePositiveInteger(req.params.id);
       if (!colorId) {
@@ -1019,7 +1072,7 @@ function createApp() {
     }
   });
 
-  app.post("/api/products", (req, res, next) => {
+  app.post("/api/products", managerOnly, (req, res, next) => {
     const transaction = db.transaction((body) => {
       const name = typeof body.name === "string" ? body.name.trim() : "";
       const description =
@@ -1160,7 +1213,7 @@ function createApp() {
     }
   });
 
-  app.put("/api/products/:id", (req, res, next) => {
+  app.put("/api/products/:id", managerOnly, (req, res, next) => {
     const transaction = db.transaction((productId, body) => {
       const existingProduct = db
         .prepare("SELECT id FROM products WHERE id = ?")
@@ -1334,7 +1387,7 @@ function createApp() {
     }
   });
 
-  app.delete("/api/products/:id", (req, res, next) => {
+  app.delete("/api/products/:id", managerOnly, (req, res, next) => {
     try {
       const productId = parsePositiveInteger(req.params.id);
       if (!productId) {
@@ -1450,7 +1503,7 @@ function createApp() {
     }
   });
 
-  app.put("/api/customers/:id", (req, res, next) => {
+  app.put("/api/customers/:id", managerOnly, (req, res, next) => {
     try {
       const customerId = parsePositiveInteger(req.params.id);
       if (!customerId) {
@@ -1512,7 +1565,7 @@ function createApp() {
     }
   });
 
-  app.delete("/api/customers/:id", (req, res, next) => {
+  app.delete("/api/customers/:id", managerOnly, (req, res, next) => {
     try {
       const customerId = parsePositiveInteger(req.params.id);
       if (!customerId) {
@@ -1640,7 +1693,7 @@ function createApp() {
     }
   });
 
-  app.put("/api/sales/:id", (req, res, next) => {
+  app.put("/api/sales/:id", managerOnly, (req, res, next) => {
     const transaction = db.transaction((saleId, body) => {
       const existingSale = db.prepare("SELECT id FROM sales WHERE id = ?").get(saleId);
       if (!existingSale) {
@@ -1734,7 +1787,7 @@ function createApp() {
     }
   });
 
-  app.delete("/api/sales/:id", (req, res, next) => {
+  app.delete("/api/sales/:id", managerOnly, (req, res, next) => {
     try {
       const saleId = parsePositiveInteger(req.params.id);
       if (!saleId) {
@@ -1749,7 +1802,7 @@ function createApp() {
     }
   });
 
-  app.get("/api/sale-items", (req, res, next) => {
+  app.get("/api/sale-items", managerOnly, (req, res, next) => {
     try {
       const saleId = req.query.sale_id ? parsePositiveInteger(req.query.sale_id) : null;
       if (req.query.sale_id && !saleId) {
@@ -1793,7 +1846,7 @@ function createApp() {
     }
   });
 
-  app.get("/api/sale-items/:id", (req, res, next) => {
+  app.get("/api/sale-items/:id", managerOnly, (req, res, next) => {
     try {
       const saleItemId = parsePositiveInteger(req.params.id);
       if (!saleItemId) {
@@ -1839,7 +1892,7 @@ function createApp() {
     }
   });
 
-  app.post("/api/sale-items", (req, res, next) => {
+  app.post("/api/sale-items", managerOnly, (req, res, next) => {
     try {
       const saleItemId = createSaleItemTransaction(req.body || {});
       const createdItem = db
@@ -1875,7 +1928,7 @@ function createApp() {
     }
   });
 
-  app.put("/api/sale-items/:id", (req, res, next) => {
+  app.put("/api/sale-items/:id", managerOnly, (req, res, next) => {
     try {
       const saleItemId = parsePositiveInteger(req.params.id);
       if (!saleItemId) {
@@ -1891,7 +1944,7 @@ function createApp() {
     }
   });
 
-  app.delete("/api/sale-items/:id", (req, res, next) => {
+  app.delete("/api/sale-items/:id", managerOnly, (req, res, next) => {
     try {
       const saleItemId = parsePositiveInteger(req.params.id);
       if (!saleItemId) {
@@ -1907,7 +1960,7 @@ function createApp() {
     }
   });
 
-  app.get("/api/dashboard", (_req, res, next) => {
+  app.get("/api/dashboard", managerOnly, (_req, res, next) => {
     try {
       const todayRevenue = toMoney(
         db

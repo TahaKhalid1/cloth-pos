@@ -7,6 +7,7 @@ A production-ready Point of Sale (POS) system for a clothing outlet store.
 - Frontend: React + Vite
 - Backend: Node.js + Express + better-sqlite3
 - Database: SQLite (auto-created, no manual setup)
+- Auth: JWT access tokens + role-based authorization (cashier, manager)
 - Charts: Recharts
 - UI utilities: lucide-react, framer-motion, react-hot-toast
 
@@ -34,6 +35,27 @@ This starts:
 
 - Backend API at http://localhost:4000
 - Frontend app at http://localhost:5173
+
+## Authentication
+
+Role-based access is enabled by default.
+
+- Manager
+  - Username: `manager`
+  - Password: `Manager@123`
+- Cashier
+  - Username: `cashier`
+  - Password: `Cashier@123`
+
+Permissions:
+
+- Cashier: checkout, products browse, customers read/create, sales read/create
+- Manager: full access, including dashboard, inventory/category/color management, and destructive actions
+
+Optional environment variables (server):
+
+- `JWT_SECRET`: signing key for access tokens
+- `JWT_EXPIRES_IN`: token TTL (default: `8h`)
 
 ## Root Scripts
 
@@ -87,6 +109,12 @@ Base URL: `http://localhost:4000/api`
 Health:
 
 - `GET /health`
+
+Auth:
+
+- `POST /auth/login`
+- `GET /auth/me`
+- `POST /auth/logout`
 
 Categories (CRUD):
 
@@ -154,3 +182,4 @@ Dashboard:
 - All client features use real API calls via axios.
 - Toasts are shown for success and error states.
 - UI is fully responsive for desktop and tablet checkout use.
+- Change default demo credentials immediately for production deployment.

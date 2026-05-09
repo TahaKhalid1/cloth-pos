@@ -1,5 +1,19 @@
 import http from "./http";
 
+export async function login(payload) {
+  const { data } = await http.post("/auth/login", payload);
+  return data;
+}
+
+export async function getCurrentUser() {
+  const { data } = await http.get("/auth/me");
+  return data;
+}
+
+export async function logout() {
+  await http.post("/auth/logout");
+}
+
 export async function getCategories() {
   const { data } = await http.get("/categories");
   return data;

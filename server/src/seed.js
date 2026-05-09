@@ -1,3 +1,5 @@
+const bcrypt = require("bcryptjs");
+
 const CATEGORY_NAMES = [
   "Shirts",
   "Pants",
@@ -193,6 +195,21 @@ const SAMPLE_CUSTOMERS = [
   }
 ];
 
+const DEFAULT_USERS = [
+  {
+    username: "manager",
+    full_name: "Store Manager",
+    role: "manager",
+    password: "Manager@123"
+  },
+  {
+    username: "cashier",
+    full_name: "Front Desk Cashier",
+    role: "cashier",
+    password: "Cashier@123"
+  }
+];
+
 function seedDatabase(db) {
   const insertCategory = db.prepare("INSERT INTO categories (name) VALUES (?)");
   const insertColor = db.prepare("INSERT INTO colors (name, hex_code) VALUES (?, ?)");
@@ -260,6 +277,35 @@ function seedDatabase(db) {
   seedTransaction();
 }
 
+function seedDefaultUsers(db) {
+  const existingCount = db.prepare("SELECT COUNT(*) AS count FROM users").get().count;
+
+  if (existingCount > 0) {
+    return;
+  }
+
+  const insertUser = db.prepare(`
+    INSERT INTO users (username, full_name, role, password_hash, is_active, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+  `);
+
+  const seedUserTransaction = db.transaction(() => {
+    DEFAULT_USERS.forEach((user) => {
+      const passwordHash = bcrypt.hashSync(user.password, 10);
+
+      insertUser.run(
+        user.username.toLowerCase(),
+        user.full_name,
+        user.role,
+        passwordHash
+      );
+    });
+  });
+
+  seedUserTransaction();
+}
+
 module.exports = {
-  seedDatabase
+  seedDatabase,
+  seedDefaultUsers
 };

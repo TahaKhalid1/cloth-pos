@@ -1,6 +1,6 @@
 const path = require("path");
 const Database = require("better-sqlite3");
-const { seedDatabase } = require("./seed");
+const { seedDatabase, seedDefaultUsers } = require("./seed");
 
 const dbFilePath = path.join(__dirname, "..", "cloth-pos.db");
 const db = new Database(dbFilePath);
@@ -88,6 +88,17 @@ function initializeDatabase() {
       FOREIGN KEY (color_id) REFERENCES colors (id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      full_name TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('cashier', 'manager')),
+      password_hash TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_products_category_id ON products (category_id);
     CREATE INDEX IF NOT EXISTS idx_products_name ON products (name);
     CREATE INDEX IF NOT EXISTS idx_products_stock_quantity ON products (stock_quantity);
@@ -97,6 +108,7 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_sales_customer_id ON sales (customer_id);
     CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items (sale_id);
     CREATE INDEX IF NOT EXISTS idx_sale_items_product_id ON sale_items (product_id);
+    CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
   `);
 
   const seedCheck = db.prepare("SELECT COUNT(*) AS count FROM categories").get();
@@ -104,6 +116,8 @@ function initializeDatabase() {
   if (seedCheck.count === 0) {
     seedDatabase(db);
   }
+
+  seedDefaultUsers(db);
 }
 
 module.exports = {
