@@ -59,6 +59,37 @@ function calculateTotals(cart, discountType, discountValue, taxEnabled, taxRate)
   };
 }
 
+function normalizeScanCode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function deriveSkuCandidates(rawCode) {
+  const trimmedUpper = String(rawCode || "").trim().toUpperCase();
+  const normalized = normalizeScanCode(rawCode);
+  const candidates = new Set();
+
+  if (trimmedUpper) {
+    candidates.add(trimmedUpper);
+  }
+
+  if (normalized) {
+    candidates.add(normalized);
+  }
+
+  const clothCodeMatch = normalized.match(/^CLTH(\d+)$/);
+  if (clothCodeMatch) {
+    candidates.add(`CLTH-${clothCodeMatch[1].padStart(4, "0")}`);
+  }
+
+  return {
+    normalized,
+    candidates: Array.from(candidates)
+  };
+}
+
 export default function POSPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -72,6 +103,7 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [isScanningBarcode, setIsScanningBarcode] = useState(false);
+  const [scanStatus, setScanStatus] = useState({ type: "idle", message: "" });
   const [activeCategory, setActiveCategory] = useState("all");
   const [activeColor, setActiveColor] = useState("all");
   const scannerInputRef = useRef(null);
@@ -96,6 +128,18 @@ export default function POSPage() {
   });
 
   const debouncedSearch = useDebouncedValue(search, 300);
+
+  function findProductByCode(productList, rawCode) {
+    const { normalized, candidates } = deriveSkuCandidates(rawCode);
+
+    return (
+      productList.find((product) => {
+        const skuUpper = String(product.sku || "").toUpperCase();
+        const skuNormalized = normalizeScanCode(skuUpper);
+        return candidates.includes(skuUpper) || (normalized && skuNormalized === normalized);
+      }) || null
+    );
+  }
 
   const totals = useMemo(
     () => calculateTotals(cart, discountType, discountValue, taxEnabled, taxRate),
@@ -273,33 +317,52 @@ export default function POSPage() {
     const barcode = String(rawCode || "").trim().toUpperCase();
 
     if (!barcode) {
-      return;
+      setScanStatus({
+        type: "error",
+        message: "Enter or scan a barcode/SKU first."
+      });
+      return false;
     }
 
-    let matchedProduct = products.find(
-      (product) => String(product.sku || "").toUpperCase() === barcode
-    );
+    let matchedProduct = findProductByCode(products, barcode);
 
     if (!matchedProduct) {
+      const { candidates } = deriveSkuCandidates(barcode);
+
       try {
-        const searchedProducts = await getProducts({ search: barcode });
-        matchedProduct =
-          searchedProducts.find(
-            (product) => String(product.sku || "").toUpperCase() === barcode
-          ) || null;
+        for (const candidate of candidates) {
+          const searchedProducts = await getProducts({ search: candidate });
+          matchedProduct = findProductByCode(searchedProducts, barcode);
+          if (matchedProduct) {
+            break;
+          }
+        }
       } catch (error) {
         toast.error(error.message || "Unable to validate scanned barcode.");
-        return;
+        setScanStatus({
+          type: "error",
+          message: "Could not validate code against catalog."
+        });
+        return false;
       }
     }
 
     if (!matchedProduct) {
       toast.error(`No product found for barcode: ${barcode}`);
-      return;
+      setScanStatus({
+        type: "error",
+        message: `No product matched code: ${barcode}`
+      });
+      return false;
     }
 
     addProductToCart(matchedProduct, "all");
     toast.success(`Scanned ${matchedProduct.sku}`);
+    setScanStatus({
+      type: "success",
+      message: `Added ${matchedProduct.name} (${matchedProduct.sku})`
+    });
+    return true;
   }
 
   async function handleBarcodeSubmit(event) {
@@ -312,14 +375,22 @@ export default function POSPage() {
     const code = barcodeInput;
 
     if (!code.trim()) {
+      setScanStatus({
+        type: "error",
+        message: "Enter or scan a barcode/SKU first."
+      });
+      toast.error("Enter or scan a barcode/SKU first.");
+      scannerInputRef.current?.focus();
       return;
     }
 
     setIsScanningBarcode(true);
 
     try {
-      await processScannedCode(code);
-      setBarcodeInput("");
+      const found = await processScannedCode(code);
+      if (found) {
+        setBarcodeInput("");
+      }
     } finally {
       setIsScanningBarcode(false);
       scannerInputRef.current?.focus();
@@ -431,8 +502,13 @@ export default function POSPage() {
               </Button>
             </form>
             <div className="scanner-hint">
-              Barcode scanner input is enabled. Keep this field focused while scanning.
+              Barcode scanner input is enabled. Supports formats like CLTH-0001 and CLTH0001.
             </div>
+            {scanStatus.message ? (
+              <div className={`scanner-status ${scanStatus.type === "success" ? "success" : "error"}`}>
+                {scanStatus.message}
+              </div>
+            ) : null}
 
             <div>
               <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.45rem" }}>

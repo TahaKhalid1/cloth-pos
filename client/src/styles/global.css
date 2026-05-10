@@ -477,6 +477,19 @@ p {
   color: var(--text-muted);
 }
 
+.scanner-status {
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+}
+
+.scanner-status.success {
+  color: #b9f0d8;
+}
+
+.scanner-status.error {
+  color: #ffdede;
+}
+
 .color-dot {
   width: 13px;
   height: 13px;
