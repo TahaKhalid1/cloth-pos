@@ -105,7 +105,7 @@ export default function POSPage() {
   const [isScanningBarcode, setIsScanningBarcode] = useState(false);
   const [scanStatus, setScanStatus] = useState({ type: "idle", message: "" });
   const [activeCategory, setActiveCategory] = useState("all");
-  const [activeColor, setActiveColor] = useState("all");
+  const [activeColorIds, setActiveColorIds] = useState([]);
   const scannerInputRef = useRef(null);
 
   const [cart, setCart] = useState([]);
@@ -121,6 +121,7 @@ export default function POSPage() {
   const [highlightProductId, setHighlightProductId] = useState(null);
 
   const [showQuickAddCustomer, setShowQuickAddCustomer] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     name: "",
     phone: "",
@@ -128,6 +129,18 @@ export default function POSPage() {
   });
 
   const debouncedSearch = useDebouncedValue(search, 300);
+  const singleActiveColor = activeColorIds.length === 1 ? activeColorIds[0] : "all";
+
+  const categoryById = useMemo(
+    () =>
+      new Map(categories.map((category) => [String(category.id), category])),
+    [categories]
+  );
+
+  const colorById = useMemo(
+    () => new Map(colors.map((color) => [String(color.id), color])),
+    [colors]
+  );
 
   function findProductByCode(productList, rawCode) {
     const { normalized, candidates } = deriveSkuCandidates(rawCode);
@@ -175,8 +188,8 @@ export default function POSPage() {
       if (activeCategory !== "all") {
         filters.category = activeCategory;
       }
-      if (activeColor !== "all") {
-        filters.color = activeColor;
+      if (activeColorIds.length) {
+        filters.color = activeColorIds.join(",");
       }
       if (debouncedSearch.trim()) {
         filters.search = debouncedSearch.trim();
@@ -189,7 +202,7 @@ export default function POSPage() {
     } finally {
       setLoadingProducts(false);
     }
-  }, [activeCategory, activeColor, debouncedSearch]);
+  }, [activeCategory, activeColorIds, debouncedSearch]);
 
   useEffect(() => {
     loadReferenceData();
@@ -199,13 +212,22 @@ export default function POSPage() {
     loadProducts();
   }, [loadProducts]);
 
-  function findVariantForProduct(product, preferredColor = activeColor) {
-    if (preferredColor !== "all") {
-      const matchedVariant = product.colors.find(
-        (color) => String(color.id) === String(preferredColor)
-      );
-      if (matchedVariant) {
-        return matchedVariant;
+  function findVariantForProduct(product, preferredColors = activeColorIds) {
+    const preferredColorList = Array.isArray(preferredColors)
+      ? preferredColors
+      : preferredColors && preferredColors !== "all"
+        ? [preferredColors]
+        : [];
+
+    if (preferredColorList.length) {
+      for (const preferredColor of preferredColorList) {
+        const matchedVariant = product.colors.find(
+          (color) => String(color.id) === String(preferredColor)
+        );
+
+        if (matchedVariant) {
+          return matchedVariant;
+        }
       }
     }
 
@@ -220,8 +242,8 @@ export default function POSPage() {
     return Math.min(product.stock_quantity, variant.stock_quantity);
   }
 
-  function addProductToCart(product, preferredColor = activeColor) {
-    const variant = findVariantForProduct(product, preferredColor);
+  function addProductToCart(product, preferredColors = activeColorIds) {
+    const variant = findVariantForProduct(product, preferredColors);
     const stockCap = getStockCap(product, variant);
 
     if (stockCap <= 0) {
@@ -313,6 +335,23 @@ export default function POSPage() {
     setCart((currentCart) => currentCart.filter((item) => item.key !== itemKey));
   }
 
+  function toggleColorFilter(colorId) {
+    const idString = String(colorId);
+
+    setActiveColorIds((current) => {
+      if (current.includes(idString)) {
+        return current.filter((id) => id !== idString);
+      }
+
+      return [...current, idString];
+    });
+  }
+
+  function removeColorFilter(colorId) {
+    const idString = String(colorId);
+    setActiveColorIds((current) => current.filter((id) => id !== idString));
+  }
+
   async function processScannedCode(rawCode) {
     const barcode = String(rawCode || "").trim().toUpperCase();
 
@@ -356,7 +395,7 @@ export default function POSPage() {
       return false;
     }
 
-    addProductToCart(matchedProduct, "all");
+    addProductToCart(matchedProduct, []);
     toast.success(`Scanned ${matchedProduct.sku}`);
     setScanStatus({
       type: "success",
@@ -403,6 +442,8 @@ export default function POSPage() {
       return;
     }
 
+    setCreatingCustomer(true);
+
     try {
       const created = await createCustomer({
         name: newCustomer.name.trim(),
@@ -418,6 +459,8 @@ export default function POSPage() {
       toast.success("Customer added.");
     } catch (error) {
       toast.error(error.message || "Unable to add customer.");
+    } finally {
+      setCreatingCustomer(false);
     }
   }
 
@@ -497,8 +540,13 @@ export default function POSPage() {
                 placeholder="Scan barcode or enter SKU and press Enter..."
                 autoComplete="off"
               />
-              <Button type="submit" variant="secondary" disabled={isScanningBarcode}>
-                {isScanningBarcode ? "Scanning..." : "Scan"}
+              <Button
+                type="submit"
+                variant="secondary"
+                isLoading={isScanningBarcode}
+                loadingText="Scanning..."
+              >
+                Scan
               </Button>
             </form>
             <div className="scanner-hint">
@@ -540,8 +588,8 @@ export default function POSPage() {
               <div className="filters-row">
                 <button
                   type="button"
-                  className={`btn ${activeColor === "all" ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() => setActiveColor("all")}
+                  className={`btn ${!activeColorIds.length ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => setActiveColorIds([])}
                 >
                   Any Color
                 </button>
@@ -550,9 +598,9 @@ export default function POSPage() {
                     key={color.id}
                     type="button"
                     className={`btn ${
-                      String(activeColor) === String(color.id) ? "btn-primary" : "btn-ghost"
+                      activeColorIds.includes(String(color.id)) ? "btn-primary" : "btn-ghost"
                     }`}
-                    onClick={() => setActiveColor(String(color.id))}
+                    onClick={() => toggleColorFilter(color.id)}
                     title={color.name}
                   >
                     <span className="color-dot" style={{ background: color.hex_code }} />
@@ -561,6 +609,45 @@ export default function POSPage() {
                 ))}
               </div>
             </div>
+
+            {search.trim() || activeCategory !== "all" || activeColorIds.length ? (
+              <div className="active-filter-tags">
+                {search.trim() ? (
+                  <button type="button" className="active-filter-tag" onClick={() => setSearch("")}>
+                    Search: "{search.trim()}" x
+                  </button>
+                ) : null}
+
+                {activeCategory !== "all" ? (
+                  <button
+                    type="button"
+                    className="active-filter-tag"
+                    onClick={() => setActiveCategory("all")}
+                  >
+                    Category: {categoryById.get(String(activeCategory))?.name || "Unknown"} x
+                  </button>
+                ) : null}
+
+                {activeColorIds.map((colorId) => {
+                  const color = colorById.get(String(colorId));
+
+                  return (
+                    <button
+                      key={colorId}
+                      type="button"
+                      className="active-filter-tag"
+                      onClick={() => removeColorFilter(colorId)}
+                    >
+                      <span
+                        className="color-dot"
+                        style={{ background: color?.hex_code || "transparent" }}
+                      />
+                      Color: {color?.name || `#${colorId}`} x
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
 
           {productsError ? (
@@ -577,7 +664,7 @@ export default function POSPage() {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  activeColor={activeColor}
+                  activeColor={singleActiveColor}
                   isPopping={highlightProductId === product.id}
                   onAdd={addProductToCart}
                 />
@@ -627,6 +714,7 @@ export default function POSPage() {
               <Button
                 variant="ghost"
                 onClick={() => setShowQuickAddCustomer((current) => !current)}
+                disabled={creatingCustomer}
               >
                 <UserPlus size={14} /> Quick Add
               </Button>
@@ -669,7 +757,12 @@ export default function POSPage() {
                   }
                 />
                 <div className="inline-form" style={{ justifyContent: "flex-end" }}>
-                  <Button variant="secondary" onClick={handleQuickAddCustomer}>
+                  <Button
+                    variant="secondary"
+                    onClick={handleQuickAddCustomer}
+                    isLoading={creatingCustomer}
+                    loadingText="Adding..."
+                  >
                     Add Customer
                   </Button>
                 </div>
@@ -743,8 +836,10 @@ export default function POSPage() {
               style={{ width: "100%", marginTop: "0.9rem", padding: "0.9rem 1rem" }}
               disabled={!cart.length || creatingSale}
               onClick={handleCompleteSale}
+              isLoading={creatingSale}
+              loadingText="Completing Sale..."
             >
-              {creatingSale ? "Completing Sale..." : "Complete Sale"}
+              Complete Sale
             </Button>
           </motion.div>
         </Card>
@@ -758,3 +853,5 @@ export default function POSPage() {
     </>
   );
 }
+
+POSPage.propTypes = {};

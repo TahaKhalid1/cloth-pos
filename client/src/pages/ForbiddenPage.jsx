@@ -23,3 +23,5 @@ export default function ForbiddenPage() {
     </div>
   );
 }
+
+ForbiddenPage.propTypes = {};

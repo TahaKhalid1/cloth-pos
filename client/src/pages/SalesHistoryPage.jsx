@@ -122,8 +122,14 @@ export default function SalesHistoryPage() {
             </Button>
           </div>
 
-          <Button variant="secondary" onClick={exportFilteredSales} disabled={exporting}>
-            <Download size={16} /> {exporting ? "Exporting..." : "Export CSV"}
+          <Button
+            variant="secondary"
+            onClick={exportFilteredSales}
+            disabled={exporting}
+            isLoading={exporting}
+            loadingText="Exporting..."
+          >
+            <Download size={16} /> Export CSV
           </Button>
         </div>
 
@@ -234,3 +240,5 @@ export default function SalesHistoryPage() {
     </>
   );
 }
+
+SalesHistoryPage.propTypes = {};

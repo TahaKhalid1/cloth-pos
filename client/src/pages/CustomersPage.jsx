@@ -101,8 +101,13 @@ export default function CustomersPage() {
                 setForm((current) => ({ ...current, email: event.target.value }))
               }
             />
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Adding..." : "Add Customer"}
+            <Button
+              type="submit"
+              disabled={submitting}
+              isLoading={submitting}
+              loadingText="Adding..."
+            >
+              Add Customer
             </Button>
           </form>
         </Card>
@@ -170,3 +175,5 @@ export default function CustomersPage() {
     </>
   );
 }
+
+CustomersPage.propTypes = {};

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar from "./components/layout/Sidebar";
 import DashboardPage from "./pages/DashboardPage";
 import POSPage from "./pages/POSPage";
@@ -22,6 +23,14 @@ export default function App() {
   const location = useLocation();
   const { isAuthenticated, isInitializing } = useAuth();
 
+  function renderPageBoundary(title, page) {
+    return (
+      <ErrorBoundary title={title} resetKey={location.pathname}>
+        {page}
+      </ErrorBoundary>
+    );
+  }
+
   if (isInitializing) {
     return <div className="loading-state">Initializing secure session...</div>;
   }
@@ -38,7 +47,10 @@ export default function App() {
           transition={pageTransition.transition}
         >
           <Routes location={location}>
-            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/login"
+              element={renderPageBoundary("Login page failed", <LoginPage />)}
+            />
             <Route path="*" element={<Navigate to="/login" replace state={{ from: location }} />} />
           </Routes>
         </motion.section>
@@ -64,7 +76,7 @@ export default function App() {
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <POSPage />
+                    {renderPageBoundary("Checkout page failed", <POSPage />)}
                   </ProtectedRoute>
                 }
               />
@@ -72,7 +84,7 @@ export default function App() {
                 path="/customers"
                 element={
                   <ProtectedRoute>
-                    <CustomersPage />
+                    {renderPageBoundary("Customers page failed", <CustomersPage />)}
                   </ProtectedRoute>
                 }
               />
@@ -80,7 +92,7 @@ export default function App() {
                 path="/dashboard"
                 element={
                   <ProtectedRoute allowedRoles={["manager"]}>
-                    <DashboardPage />
+                    {renderPageBoundary("Dashboard page failed", <DashboardPage />)}
                   </ProtectedRoute>
                 }
               />
@@ -88,7 +100,7 @@ export default function App() {
                 path="/inventory"
                 element={
                   <ProtectedRoute allowedRoles={["manager"]}>
-                    <InventoryPage />
+                    {renderPageBoundary("Inventory page failed", <InventoryPage />)}
                   </ProtectedRoute>
                 }
               />
@@ -96,7 +108,7 @@ export default function App() {
                 path="/sales"
                 element={
                   <ProtectedRoute allowedRoles={["manager"]}>
-                    <SalesHistoryPage />
+                    {renderPageBoundary("Sales history page failed", <SalesHistoryPage />)}
                   </ProtectedRoute>
                 }
               />
@@ -104,7 +116,7 @@ export default function App() {
                 path="/forbidden"
                 element={
                   <ProtectedRoute>
-                    <ForbiddenPage />
+                    {renderPageBoundary("Access page failed", <ForbiddenPage />)}
                   </ProtectedRoute>
                 }
               />
@@ -117,3 +129,5 @@ export default function App() {
     </div>
   );
 }
+
+App.propTypes = {};

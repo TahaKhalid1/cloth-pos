@@ -62,6 +62,14 @@ export default function DashboardPage() {
     return <div className="alert-box">No dashboard data found.</div>;
   }
 
+  const weeklyTrend = dashboard.kpis.weekly_trend || {
+    direction: "up",
+    delta: 0,
+    percent: 0
+  };
+  const weeklyTrendArrow = weeklyTrend.direction === "down" ? "▼" : "▲";
+  const weeklyTrendPercent = Number(weeklyTrend.percent || 0);
+
   const kpiCards = [
     {
       label: "Today's Revenue",
@@ -69,7 +77,9 @@ export default function DashboardPage() {
     },
     {
       label: "Weekly Revenue",
-      value: formatCurrency(dashboard.kpis.weekly_revenue)
+      value: formatCurrency(dashboard.kpis.weekly_revenue),
+      trendDirection: weeklyTrend.direction,
+      trend: `${weeklyTrendArrow} ${formatCurrency(Math.abs(weeklyTrend.delta || 0))} (${weeklyTrendPercent.toFixed(1)}%) vs previous week`
     },
     {
       label: "Monthly Revenue",
@@ -95,6 +105,15 @@ export default function DashboardPage() {
           <Card key={kpi.label}>
             <div className="kpi-label">{kpi.label}</div>
             <div className="kpi-value">{kpi.value}</div>
+            {kpi.trend ? (
+              <div
+                className={`kpi-trend ${
+                  kpi.trendDirection === "down" ? "down" : "up"
+                }`.trim()}
+              >
+                {kpi.trend}
+              </div>
+            ) : null}
           </Card>
         ))}
       </section>
@@ -153,6 +172,38 @@ export default function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
           </div>
+        </Card>
+      </section>
+
+      <section style={{ marginTop: "1rem" }}>
+        <Card>
+          <h3 style={{ marginBottom: "0.8rem" }}>Top 5 Best Sellers</h3>
+          <Table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Product</th>
+                <th>Units Sold</th>
+                <th>Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dashboard.top_products.length ? (
+                dashboard.top_products.map((product, index) => (
+                  <tr key={product.id}>
+                    <td>#{index + 1}</td>
+                    <td>{product.name}</td>
+                    <td>{product.quantity_sold}</td>
+                    <td>{formatCurrency(product.revenue)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4}>No best-seller data available yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
         </Card>
       </section>
 
@@ -220,3 +271,5 @@ export default function DashboardPage() {
     </>
   );
 }
+
+DashboardPage.propTypes = {};

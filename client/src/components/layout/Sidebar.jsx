@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   CreditCard,
@@ -8,6 +9,7 @@ import {
   Users
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { getDashboard } from "../../api/posApi";
 import { useAuth } from "../../auth/AuthContext";
 import Button from "../ui/Button";
 
@@ -21,6 +23,56 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const { user, role, logout } = useAuth();
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const [loadingLowStock, setLoadingLowStock] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLowStockCount() {
+      if (role !== "manager") {
+        setLowStockCount(0);
+        setLoadingLowStock(false);
+        return;
+      }
+
+      setLoadingLowStock(true);
+
+      try {
+        const dashboardData = await getDashboard();
+        if (!isMounted) {
+          return;
+        }
+
+        setLowStockCount(dashboardData?.low_stock_alerts?.length || 0);
+      } catch (_error) {
+        if (isMounted) {
+          setLowStockCount(0);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingLowStock(false);
+        }
+      }
+    }
+
+    loadLowStockCount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [role]);
+
+  async function handleLogout() {
+    setIsSigningOut(true);
+
+    try {
+      await logout();
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
 
   const visibleNavItems = NAV_ITEMS.filter((item) =>
     item.roles.includes(role || "")
@@ -54,14 +106,28 @@ export default function Sidebar() {
               }
             >
               <Icon size={18} />
-              <span>{item.label}</span>
+              <span className="nav-item-text">{item.label}</span>
+              {item.to === "/dashboard" ? (
+                <div
+                  className={`nav-alert-badge ${lowStockCount > 0 ? "has-alert" : ""}`.trim()}
+                  title="Products with critically low stock"
+                >
+                  {loadingLowStock ? <span className="nav-badge-loader" /> : lowStockCount}
+                </div>
+              ) : null}
             </NavLink>
           );
         })}
       </nav>
 
       <div className="sidebar-footer">
-        <Button variant="ghost" className="sidebar-logout" onClick={logout}>
+        <Button
+          variant="ghost"
+          className="sidebar-logout"
+          onClick={handleLogout}
+          isLoading={isSigningOut}
+          loadingText="Signing out..."
+        >
           <LogOut size={16} />
           <span>Sign Out</span>
         </Button>
@@ -69,3 +135,5 @@ export default function Sidebar() {
     </aside>
   );
 }
+
+Sidebar.propTypes = {};

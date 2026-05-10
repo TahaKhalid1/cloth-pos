@@ -1,3 +1,5 @@
+import PropTypes from "prop-types";
+
 export default function LoadingState({ message = "Loading data..." }) {
   return (
     <div className="loading-state">
@@ -8,3 +10,11 @@ export default function LoadingState({ message = "Loading data..." }) {
     </div>
   );
 }
+
+LoadingState.propTypes = {
+  message: PropTypes.string
+};
+
+LoadingState.defaultProps = {
+  message: "Loading data..."
+};

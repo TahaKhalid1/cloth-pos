@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { setAuthToken } from "../api/http";
 import {
   getCurrentUser,
@@ -137,6 +138,10 @@ export function AuthProvider({ children }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+AuthProvider.propTypes = {
+  children: PropTypes.node.isRequired
+};
 
 export function useAuth() {
   const context = useContext(AuthContext);

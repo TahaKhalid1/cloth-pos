@@ -104,3 +104,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+LoginPage.propTypes = {};

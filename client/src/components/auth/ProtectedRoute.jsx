@@ -1,3 +1,4 @@
+import PropTypes from "prop-types";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 
@@ -19,3 +20,12 @@ export default function ProtectedRoute({ children, allowedRoles = null }) {
 
   return children;
 }
+
+ProtectedRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+  allowedRoles: PropTypes.arrayOf(PropTypes.string)
+};
+
+ProtectedRoute.defaultProps = {
+  allowedRoles: null
+};

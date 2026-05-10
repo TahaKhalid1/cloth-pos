@@ -1,3 +1,5 @@
+import PropTypes from "prop-types";
+
 export default function Card({ children, className = "", ...props }) {
   return (
     <section className={`card ${className}`.trim()} {...props}>
@@ -5,3 +7,13 @@ export default function Card({ children, className = "", ...props }) {
     </section>
   );
 }
+
+Card.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string
+};
+
+Card.defaultProps = {
+  children: null,
+  className: ""
+};

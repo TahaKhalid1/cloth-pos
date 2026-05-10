@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import PropTypes from "prop-types";
 import Badge from "./ui/Badge";
 import { formatCurrency } from "../utils/format";
 import { getFallbackProductImage, getProductImage } from "../utils/productImages";
@@ -74,3 +75,28 @@ export default function ProductCard({ product, onAdd, isPopping = false, activeC
     </motion.article>
   );
 }
+
+ProductCard.propTypes = {
+  product: PropTypes.shape({
+    id: PropTypes.number.isRequired,
+    name: PropTypes.string.isRequired,
+    price: PropTypes.number.isRequired,
+    stock_quantity: PropTypes.number.isRequired,
+    colors: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.number.isRequired,
+        name: PropTypes.string,
+        hex_code: PropTypes.string,
+        stock_quantity: PropTypes.number
+      })
+    ).isRequired
+  }).isRequired,
+  onAdd: PropTypes.func.isRequired,
+  isPopping: PropTypes.bool,
+  activeColor: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+};
+
+ProductCard.defaultProps = {
+  isPopping: false,
+  activeColor: "all"
+};

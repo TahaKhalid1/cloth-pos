@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import PropTypes from "prop-types";
 import Button from "./Button";
 
 export default function Modal({
@@ -44,3 +45,21 @@ export default function Modal({
     document.body
   );
 }
+
+Modal.propTypes = {
+  isOpen: PropTypes.bool,
+  title: PropTypes.string,
+  children: PropTypes.node,
+  onClose: PropTypes.func,
+  footer: PropTypes.node,
+  size: PropTypes.oneOf(["default", "large"])
+};
+
+Modal.defaultProps = {
+  isOpen: false,
+  title: "",
+  children: null,
+  onClose: undefined,
+  footer: null,
+  size: "default"
+};

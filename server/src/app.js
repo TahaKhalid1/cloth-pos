@@ -108,9 +108,22 @@ function getProductsWithFilters(filters = {}) {
 
   if (filters.color) {
     const rawColor = String(filters.color).trim();
-    if (/^\d+$/.test(rawColor)) {
-      whereClauses.push("co.id = @colorId");
-      queryParams.colorId = Number(rawColor);
+    const colorFilters = rawColor
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const numericColorFilters = colorFilters.filter((value) => /^\d+$/.test(value));
+
+    if (numericColorFilters.length && numericColorFilters.length === colorFilters.length) {
+      const placeholders = numericColorFilters.map(
+        (_value, index) => `@colorId${index}`
+      );
+      whereClauses.push(`co.id IN (${placeholders.join(", ")})`);
+
+      numericColorFilters.forEach((value, index) => {
+        queryParams[`colorId${index}`] = Number(value);
+      });
     } else {
       whereClauses.push("LOWER(co.name) = LOWER(@colorName)");
       queryParams.colorName = rawColor;
@@ -1978,6 +1991,22 @@ function createApp() {
           .get().revenue
       );
 
+      const previousWeekRevenue = toMoney(
+        db
+          .prepare(
+            "SELECT COALESCE(SUM(total), 0) AS revenue FROM sales WHERE date(created_at) >= date('now', 'localtime', '-13 days') AND date(created_at) <= date('now', 'localtime', '-7 days')"
+          )
+          .get().revenue
+      );
+
+      const weeklyDelta = toMoney(weeklyRevenue - previousWeekRevenue);
+      const weeklyTrendPercent =
+        previousWeekRevenue > 0
+          ? toMoney((Math.abs(weeklyDelta) / previousWeekRevenue) * 100)
+          : weeklyRevenue > 0
+            ? 100
+            : 0;
+
       const monthlyRevenue = toMoney(
         db
           .prepare(
@@ -2069,7 +2098,7 @@ function createApp() {
             c.name AS category_name
           FROM products p
           JOIN categories c ON c.id = p.category_id
-          WHERE p.stock_quantity < 10
+          WHERE p.stock_quantity < 5
           ORDER BY p.stock_quantity ASC, p.name ASC
           LIMIT 20
         `
@@ -2110,6 +2139,12 @@ function createApp() {
         kpis: {
           today_revenue: todayRevenue,
           weekly_revenue: weeklyRevenue,
+          previous_week_revenue: previousWeekRevenue,
+          weekly_trend: {
+            direction: weeklyDelta >= 0 ? "up" : "down",
+            delta: weeklyDelta,
+            percent: weeklyTrendPercent
+          },
           monthly_revenue: monthlyRevenue,
           total_transactions: totalTransactions
         },

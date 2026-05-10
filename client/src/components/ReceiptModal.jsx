@@ -1,3 +1,4 @@
+import PropTypes from "prop-types";
 import { FileDown, Printer } from "lucide-react";
 import { toast } from "react-hot-toast";
 import Badge from "./ui/Badge";
@@ -6,10 +7,26 @@ import Modal from "./ui/Modal";
 import { formatCurrency, formatDateTime } from "../utils/format";
 import { downloadInvoicePdf } from "../utils/invoicePdf";
 
+function getReceiptDateCode(rawDate) {
+  const parsedDate = rawDate ? new Date(rawDate) : new Date();
+  const safeDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  const year = safeDate.getFullYear();
+  const month = String(safeDate.getMonth() + 1).padStart(2, "0");
+  const day = String(safeDate.getDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+function buildReceiptNumber(sale) {
+  const suffix = String(sale?.id || 0).padStart(4, "0").slice(-4);
+  return `#RCT-${getReceiptDateCode(sale?.created_at)}-${suffix}`;
+}
+
 export default function ReceiptModal({ sale, isOpen, onClose }) {
   if (!sale) {
     return null;
   }
+
+  const receiptNumber = buildReceiptNumber(sale);
 
   function handleDownloadPdf() {
     try {
@@ -23,7 +40,7 @@ export default function ReceiptModal({ sale, isOpen, onClose }) {
   return (
     <Modal
       isOpen={isOpen}
-      title={`Receipt #${sale.id}`}
+      title={`Receipt ${receiptNumber}`}
       onClose={onClose}
       footer={
         <>
@@ -38,10 +55,16 @@ export default function ReceiptModal({ sale, isOpen, onClose }) {
       }
     >
       <div className="receipt-print-area">
-        <h3>Cloth POS</h3>
-        <p style={{ marginBottom: "0.65rem", color: "#333" }}>
-          Premium Clothing Outlet
-        </p>
+        <div className="receipt-brand">
+          <h3>The Cloth Outlet</h3>
+          <p>Premium fashion for everyday confidence.</p>
+          <p>Downtown Fashion District | +1 (555) 010-1000</p>
+        </div>
+
+        <div className="receipt-row">
+          <span>Receipt No.</span>
+          <strong>{receiptNumber}</strong>
+        </div>
 
         <div className="receipt-row">
           <span>Sale ID</span>
@@ -96,7 +119,42 @@ export default function ReceiptModal({ sale, isOpen, onClose }) {
           <span>Total</span>
           <strong>{formatCurrency(sale.total)}</strong>
         </div>
+
+        <div className="receipt-thank-you">
+          Thank you for shopping with The Cloth Outlet.
+        </div>
       </div>
     </Modal>
   );
 }
+
+ReceiptModal.propTypes = {
+  sale: PropTypes.shape({
+    id: PropTypes.number,
+    created_at: PropTypes.string,
+    customer_name: PropTypes.string,
+    subtotal: PropTypes.number,
+    discount_type: PropTypes.string,
+    discount_amount: PropTypes.number,
+    tax_enabled: PropTypes.bool,
+    tax_rate: PropTypes.number,
+    tax_amount: PropTypes.number,
+    total: PropTypes.number,
+    items: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.number,
+        product_name: PropTypes.string,
+        color_name: PropTypes.string,
+        quantity: PropTypes.number,
+        line_total: PropTypes.number
+      })
+    )
+  }),
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func.isRequired
+};
+
+ReceiptModal.defaultProps = {
+  sale: null,
+  isOpen: false
+};

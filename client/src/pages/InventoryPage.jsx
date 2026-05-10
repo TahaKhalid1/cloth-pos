@@ -43,6 +43,9 @@ export default function InventoryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState(INITIAL_FORM);
   const [creatingProduct, setCreatingProduct] = useState(false);
+  const [reorderProduct, setReorderProduct] = useState(null);
+  const [reorderStockQuantity, setReorderStockQuantity] = useState("");
+  const [reorderingProductId, setReorderingProductId] = useState(null);
 
   const debouncedSearch = useDebouncedValue(search, 280);
 
@@ -217,6 +220,57 @@ export default function InventoryPage() {
     }
   }
 
+  function openReorderModal(product) {
+    setReorderProduct(product);
+    setReorderStockQuantity(String(product.stock_quantity || 0));
+  }
+
+  function closeReorderModal() {
+    setReorderProduct(null);
+    setReorderStockQuantity("");
+  }
+
+  async function handleConfirmReorder() {
+    if (!reorderProduct) {
+      return;
+    }
+
+    const nextStock = Number.parseInt(reorderStockQuantity, 10);
+
+    if (!Number.isFinite(nextStock) || nextStock < 0) {
+      toast.error("Stock quantity must be a non-negative integer.");
+      return;
+    }
+
+    setReorderingProductId(reorderProduct.id);
+
+    try {
+      const updatedProduct = await updateProduct(reorderProduct.id, {
+        stock_quantity: nextStock
+      });
+
+      setProducts((current) =>
+        current.map((product) =>
+          product.id === reorderProduct.id ? updatedProduct : product
+        )
+      );
+      setDrafts((current) => ({
+        ...current,
+        [reorderProduct.id]: {
+          ...current[reorderProduct.id],
+          stock_quantity: updatedProduct.stock_quantity,
+          price: updatedProduct.price
+        }
+      }));
+      toast.success("Reorder stock updated.");
+      closeReorderModal();
+    } catch (error) {
+      toast.error(error.message || "Failed to reorder stock.");
+    } finally {
+      setReorderingProductId(null);
+    }
+  }
+
   return (
     <>
       <div className="page-header">
@@ -326,30 +380,46 @@ export default function InventoryPage() {
                       />
                     </td>
                     <td>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={drafts[product.id]?.stock_quantity ?? product.stock_quantity}
-                        onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [product.id]: {
-                              ...current[product.id],
-                              stock_quantity: event.target.value
-                            }
-                          }))
-                        }
-                        style={{ minWidth: "94px" }}
-                      />
+                      <div style={{ display: "grid", gap: "0.4rem" }}>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={drafts[product.id]?.stock_quantity ?? product.stock_quantity}
+                          onChange={(event) =>
+                            setDrafts((current) => ({
+                              ...current,
+                              [product.id]: {
+                                ...current[product.id],
+                                stock_quantity: event.target.value
+                              }
+                            }))
+                          }
+                          style={{ minWidth: "94px" }}
+                        />
+                        {Number(product.stock_quantity) < 5 ? (
+                          <span className="low-stock-badge">Low stock</span>
+                        ) : null}
+                      </div>
                     </td>
                     <td>
-                      <Button
-                        variant="secondary"
-                        onClick={() => handleSaveInline(product.id)}
-                        disabled={savingProductId === product.id}
-                      >
-                        {savingProductId === product.id ? "Saving..." : "Save"}
-                      </Button>
+                      <div className="inline-form" style={{ flexWrap: "wrap" }}>
+                        <Button
+                          variant="secondary"
+                          onClick={() => handleSaveInline(product.id)}
+                          disabled={savingProductId === product.id}
+                          isLoading={savingProductId === product.id}
+                          loadingText="Saving..."
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => openReorderModal(product)}
+                          disabled={reorderingProductId === product.id}
+                        >
+                          Reorder
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -372,8 +442,14 @@ export default function InventoryPage() {
             <Button variant="ghost" onClick={() => setShowAddModal(false)}>
               Cancel
             </Button>
-            <Button type="submit" form="add-product-form" disabled={creatingProduct}>
-              {creatingProduct ? "Creating..." : "Create Product"}
+            <Button
+              type="submit"
+              form="add-product-form"
+              disabled={creatingProduct}
+              isLoading={creatingProduct}
+              loadingText="Creating..."
+            >
+              Create Product
             </Button>
           </>
         }
@@ -458,6 +534,42 @@ export default function InventoryPage() {
           </div>
         </form>
       </Modal>
+
+      <Modal
+        isOpen={Boolean(reorderProduct)}
+        title={reorderProduct ? `Reorder ${reorderProduct.name}` : "Reorder Product"}
+        onClose={closeReorderModal}
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeReorderModal}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmReorder}
+              isLoading={Boolean(reorderProduct && reorderingProductId === reorderProduct.id)}
+              loadingText="Updating..."
+            >
+              Update Stock
+            </Button>
+          </>
+        }
+      >
+        {reorderProduct ? (
+          <div style={{ display: "grid", gap: "0.7rem" }}>
+            <div style={{ color: "var(--text-muted)" }}>
+              Set the new stock quantity for <strong>{reorderProduct.name}</strong>.
+            </div>
+            <Input
+              type="number"
+              min="0"
+              value={reorderStockQuantity}
+              onChange={(event) => setReorderStockQuantity(event.target.value)}
+            />
+          </div>
+        ) : null}
+      </Modal>
     </>
   );
 }
+
+InventoryPage.propTypes = {};

@@ -1,3 +1,4 @@
+import PropTypes from "prop-types";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
 import { formatCurrency } from "../utils/format";
@@ -39,3 +40,16 @@ export default function CartItem({ item, onIncrease, onDecrease, onRemove }) {
     </div>
   );
 }
+
+CartItem.propTypes = {
+  item: PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    color_name: PropTypes.string,
+    unit_price: PropTypes.number.isRequired,
+    quantity: PropTypes.number.isRequired
+  }).isRequired,
+  onIncrease: PropTypes.func.isRequired,
+  onDecrease: PropTypes.func.isRequired,
+  onRemove: PropTypes.func.isRequired
+};
